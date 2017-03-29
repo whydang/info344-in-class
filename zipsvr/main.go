@@ -1,7 +1,7 @@
 package main
 
 // go install should turn it into a bash command?
-// solution: make sure that it is inside SRC folder
+// solution: make sure i'm in the right dir
 // go install && zipsvr
 
 import (
@@ -33,9 +33,11 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
 	// set addr
 	addr := os.Getenv("ADDR")
 	// if not found
+	// require bash this command: export ADDR=localhost:8000
 	if len(addr) == 0 {
 		log.Fatal("please set ADDR env var")
 	}
