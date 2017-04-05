@@ -126,7 +126,8 @@ func main() {
 	}
 
 	// file stored, and err stored if any
-	f, err := os.Open("../data/zips.json")
+	// f, err := os.Open("../data/zips.json")
+	f, err := os.Open("zips.json")
 
 	if err != nil {
 		log.Fatal("err opening zip file: " + err.Error())
