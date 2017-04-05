@@ -16,10 +16,11 @@
         });
 
         function GetZips(city) {
-            var url = "http://localhost:8000/zips/city/" + city;
+            var url = "http://138.68.241.229/zips/city/" + city;
             fetch(url).then(function(resp) {
                 return resp.json();
             }).then(function(data) {
+                alert("status 200 OK!");
                 console.log(data);
             }).catch(function(err) {
                 console.error(err);
