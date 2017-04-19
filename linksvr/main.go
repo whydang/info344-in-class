@@ -8,6 +8,13 @@ import (
 
 	"strings"
 
+	"encoding/json"
+
+	"io"
+
+	"time"
+
+	"github.com/go-redis/redis"
 	"golang.org/x/net/html"
 )
 
@@ -68,17 +75,47 @@ func getPageSummary(URL string) (*PageSummary, error) {
 	} //for each token
 } //getPageSummary()
 
+type HandlerContext struct {
+	redisClient *redis.Client
+}
+
 //SummaryHandler handles the /v1/summary resource
-func SummaryHandler(w http.ResponseWriter, r *http.Request) {
+func (ctx *HandlerContext) SummaryHandler(w http.ResponseWriter, r *http.Request) {
 	URL := r.FormValue("url")
 	if len(URL) == 0 {
 		http.Error(w, "please supply a `url` query string parameter", http.StatusBadRequest)
 		return
 	}
 
-	//TODO: call getPageSummary() passing URL
-	//marshal struct into JSON, and write it
-	//to the response
+	// are there any bytes associated with the redis database
+	jbuf, err := ctx.redisClient.Get(URL).Bytes()
+	// redis.Nil thrown by redis
+	if err != nil && redis.Nil {
+		http.Error(w, "error getting from cache "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err == redis.Nil {
+		//TODO: call getPageSummary() passing URL
+		//marshal struct into JSON, and write it
+		//to the response
+		pgSum, err := getPageSummary(URL)
+		if err != nil && err != io.EOF {
+			http.Error(w, "error getting pg summ:"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		jbuf, err = json.Marshal(pgSum)
+		if err != nil {
+			http.Error(w, "error marshalling json"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		ctx.redisClient.Set(URL, jbuf, time.Second*60)
+	}
+
+	w.Header().Add(headerContentType, contentTypeJSON)
+	w.Write(jbuf)
 }
 
 func main() {
@@ -89,7 +126,18 @@ func main() {
 	}
 	addr := host + ":" + port
 
-	http.HandleFunc("/v1/summary", SummaryHandler)
+	//connect to redis
+	ropts := redis.Options{
+		Addr: "localhost:6379",
+	}
+	rclient := redis.NewClient(&ropts)
+	// a poiter, no need to get pointer of it later
+	hctx := &HandlerContext{
+		redisClient: rclient,
+	}
+
+	// hctx.SummaryHandler, makes hctx available to handler...
+	http.HandleFunc("/v1/summary", hctx.SummaryHandler)
 
 	fmt.Printf("listening at %s...\n", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
